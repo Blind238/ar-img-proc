@@ -3,19 +3,10 @@ package main
 import (
 	"fmt"
 	"image"
-	"image/color"
 	_ "image/png"
 	"log"
 	"os"
 )
-
-type myImage struct {
-	image.Image
-}
-
-func (m *myImage) ColorModel() color.Model {
-	return color.NRGBAModel
-}
 
 // how to use the above so the output at image.Decode is converted/cast
 
@@ -45,5 +36,10 @@ func main() {
 			fmt.Println(p)
 		}
 	}
+
+	imgTpl := `<html><head></head><body>
+	<img src="data:image/jpg;base64,{{.ImageOrig}}">
+	<img src="data:image/jpg;base64,{{.ImageNew}}">
+	</body></html>`
 
 }
