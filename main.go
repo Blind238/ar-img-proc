@@ -1,12 +1,23 @@
 package main
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
+	"html/template"
 	"image"
-	_ "image/png"
+	"image/png"
 	"log"
+	"net/http"
 	"os"
 )
+
+type images struct {
+	ImageOrig string
+	ImageNew  string
+}
+
+var nm string
 
 // how to use the above so the output at image.Decode is converted/cast
 
@@ -37,9 +48,21 @@ func main() {
 		}
 	}
 
-	imgTpl := `<html><head></head><body>
-	<img src="data:image/jpg;base64,{{.ImageOrig}}">
-	<img src="data:image/jpg;base64,{{.ImageNew}}">
-	</body></html>`
+	var buf bytes.Buffer
 
+	png.Encode(&buf, n)
+
+	nm = base64.StdEncoding.EncodeToString(buf.Bytes())
+
+	http.HandleFunc("/", handler)
+	err = http.ListenAndServe(":8080", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	t, _ := template.ParseFiles("tpl.html")
+
+	t.Execute(w, images{ImageOrig: nm, ImageNew: nm})
 }
