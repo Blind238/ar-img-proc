@@ -3,9 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <title>Images</title>
+    <style>
+       body {
+           padding: 0;
+           margin: 0;
+       }
+
+       .container {
+           display: flex;
+       }
+
+       .image {
+           flex: auto;
+       }
+
+       img {
+           width: 100%;
+       }
+     
+    </style>
 </head>
 <body>
-    <img src="data:image/png;base64,{{.ImageOrig}}">
-    <img src="data:image/png;base64,{{.ImageNew}}">
+    <div class="container">
+        <div class="image">
+            <img src="reference">
+        </div>
+        <div class="image">
+            <img src="grayscale">
+        </div>
+    </div>
+    <div class="container">
+        <div class="image">
+            <img src="reference">
+        </div>
+        <div class="image">
+            <img src="interpolation">
+        </div>
+    </div>
+    <div class="container">
+        <div class="image">
+            <img src="reference">
+        </div>
+        <div class="image">
+            <img src="kaymean">
+        </div>
+    </div>
 </body>
 </html>
