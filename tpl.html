@@ -11,7 +11,7 @@
 
        .container {
            display: flex;
-           max-width: 40em;
+           max-width: 60em;
        }
 
        .image {
@@ -19,7 +19,9 @@
        }
 
        img {
-           image-rendering: pixelated;
+           -ms-interpolation-mode: nearest-neighbor; /* IE7+ non-standard*/
+           image-rendering: -moz-crisp-edges; /* Firefox */
+           image-rendering: pixelated; /* Chrome */
            width: 100%;
        }
      
@@ -42,6 +44,9 @@
         </div>
         <div class="image">
             <img src="yuv">
+        </div>
+        <div class="image">
+            <img src="yuvgray">
         </div>
     </div>
     <h1>Interpolation</h1>

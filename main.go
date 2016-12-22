@@ -46,6 +46,7 @@ func main() {
 	http.HandleFunc("/reference", refHandler)
 	http.HandleFunc("/grayscale", grayHandler)
 	http.HandleFunc("/yuv", yuvHandler)
+	http.HandleFunc("/yuvgray", yuvGrayHandler)
 	http.HandleFunc("/", handler)
 
 	err = http.ListenAndServe(":8080", nil)
@@ -106,6 +107,48 @@ func yuvHandler(w http.ResponseWriter, req *http.Request) {
 
 		if i%4 == 3 {
 			y, u, v := rgbToYUV(p[0], p[1], p[2])
+
+			x := (i+1)/4 - 1
+
+			yuv[x] = make([]float32, 3)
+
+			yuv[x][0] = y
+			yuv[x][1] = u
+			yuv[x][2] = v
+
+		}
+	}
+
+	rgb := image.NewNRGBA(ref.Bounds())
+
+	for i := 0; i < len(yuv); i++ {
+		r, g, b := yuvToRGB(yuv[i][0], yuv[i][1], yuv[i][2])
+		rgb.Pix[i*4] = r
+		rgb.Pix[i*4+1] = g
+		rgb.Pix[i*4+2] = b
+		rgb.Pix[i*4+3] = 255 //alpha
+	}
+
+	err := writePng(w, rgb)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
+	// convert to YUV and back again (and be able to change Y value)
+
+	yuv := make([][]float32, len(ref.Pix)/4)
+	p := make([]uint8, 4)
+
+	for i := 0; i < len(ref.Pix); i++ {
+		p[i%4] = ref.Pix[i]
+
+		if i%4 == 3 {
+			y, u, v := rgbToYUV(p[0], p[1], p[2])
+
+			u = 0
+			v = 0
 
 			x := (i+1)/4 - 1
 
