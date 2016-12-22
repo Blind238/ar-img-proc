@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"image"
 	"image/png"
 	"log"
@@ -13,19 +12,17 @@ import (
 
 var ref *image.NRGBA
 
-// how to use the above so the output at image.Decode is converted/cast
-
 func main() {
 	f, err := os.Open("images/sample.png")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
 
 	m, _, err := image.Decode(f)
 	if err != nil {
 		log.Fatal(err)
 	}
+	f.Close()
 
 	//nData := myImage(mData) => cannot convert mData (type image.Image) to
 	//                           type myImage
@@ -55,7 +52,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("ready and listening on :8080")
+
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -121,8 +118,6 @@ func yuvHandler(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	log.Println(yuv)
-
 	rgb := image.NewNRGBA(ref.Bounds())
 
 	for i := 0; i < len(yuv); i++ {
@@ -147,43 +142,28 @@ func rgbToYUV(r uint8, g uint8, b uint8) (y float32, u float32, v float32) {
 	var uMax float32 = 0.436
 	var vMax float32 = 0.615
 
-	y = rconst*float32(r) + gconst*float32(g) + bconst*float32(b)
-	fmt.Println(y)
-	if y > 1 {
-		y = 1
-	}
-	if y < -1 {
-		y = -1
-	}
+	rf := float32(r) / 255
+	gf := float32(g) / 255
+	bf := float32(b) / 255
 
-	u = 0.492 * (float32(b) - y)
-	v = 0.877 * (float32(r) - y)
-	fmt.Println(u, v)
+	y = rconst*rf + gconst*gf + bconst*bf
 
-	if u > uMax {
-		u = uMax
-	}
-	if u < -uMax {
-		u = -uMax
-	}
+	y = clampf(y, 1)
 
-	if v > vMax {
-		v = vMax
-	}
-	if v < -vMax {
-		v = -vMax
-	}
+	u = 0.492 * (float32(bf) - y)
+	v = 0.877 * (float32(rf) - y)
 
-	fmt.Println(r, g, b, y, u, v)
+	u = clampf(u, uMax)
+	v = clampf(v, vMax)
 
 	return y, u, v
 }
 
 func yuvToRGB(y float32, u float32, v float32) (r uint8, g uint8, b uint8) {
 
-	r = uint8(y + 1.14*v)
-	g = uint8(y - 0.395*u - 0.581*v)
-	b = uint8(y + 2.033*u)
+	r = uint8((y + 1.14*v) * 255)
+	g = uint8((y - 0.395*u - 0.581*v) * 255)
+	b = uint8((y + 2.033*u) * 255)
 
 	return r, g, b
 }
@@ -207,4 +187,17 @@ func writePng(w http.ResponseWriter, m image.Image) error {
 	}
 
 	return nil
+}
+
+func clampf(f float32, limit float32) float32 {
+	if limit < 0 {
+		limit *= -1
+	}
+
+	if f > limit {
+		f = limit
+	} else if f < -limit {
+		f = -limit
+	}
+	return f
 }
