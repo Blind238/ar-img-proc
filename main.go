@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/png"
 	"log"
@@ -32,6 +33,7 @@ func main() {
 	http.HandleFunc("/yuvgray", yuvGrayHandler)
 	http.HandleFunc("/", handler)
 
+	fmt.Println("Serving on :8080")
 	err = http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatal(err)
@@ -58,8 +60,8 @@ func grayHandler(w http.ResponseWriter, r *http.Request) {
 
 	p := make([]uint8, 4) // for R,G,B,A
 
-	for i := 0; i < len(ref.Pix); i++ {
-		p[i%4] = ref.Pix[i]
+	for i, rp := range ref.Pix {
+		p[i%4] = rp
 
 		if i%4 == 3 {
 			// take average via int, convert back to uint8
@@ -82,30 +84,29 @@ func grayHandler(w http.ResponseWriter, r *http.Request) {
 func yuvHandler(w http.ResponseWriter, req *http.Request) {
 	// convert to YUV and back again (and be able to change Y value)
 
-	yuv := make([][]float32, len(ref.Pix)/4)
+	yuvs := make([][]float32, len(ref.Pix)/4)
 	p := make([]uint8, 4)
 
-	for i := 0; i < len(ref.Pix); i++ {
-		p[i%4] = ref.Pix[i]
+	for i, rp := range ref.Pix {
+		p[i%4] = rp
 
 		if i%4 == 3 {
 			y, u, v := rgbToYUV(p[0], p[1], p[2])
 
 			x := (i+1)/4 - 1
 
-			yuv[x] = make([]float32, 3)
+			yuvs[x] = make([]float32, 3)
 
-			yuv[x][0] = y
-			yuv[x][1] = u
-			yuv[x][2] = v
-
+			yuvs[x][0] = y
+			yuvs[x][1] = u
+			yuvs[x][2] = v
 		}
 	}
 
 	rgb := image.NewNRGBA(ref.Bounds())
 
-	for i := 0; i < len(yuv); i++ {
-		r, g, b := yuvToRGB(yuv[i][0], yuv[i][1], yuv[i][2])
+	for i, yuv := range yuvs {
+		r, g, b := yuvToRGB(yuv[0], yuv[1], yuv[2])
 		rgb.Pix[i*4] = r
 		rgb.Pix[i*4+1] = g
 		rgb.Pix[i*4+2] = b
@@ -121,11 +122,11 @@ func yuvHandler(w http.ResponseWriter, req *http.Request) {
 func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
 	// convert to YUV and back again (and be able to change Y value)
 
-	yuv := make([][]float32, len(ref.Pix)/4)
+	yuvs := make([][]float32, len(ref.Pix)/4)
 	p := make([]uint8, 4)
 
-	for i := 0; i < len(ref.Pix); i++ {
-		p[i%4] = ref.Pix[i]
+	for i, rp := range ref.Pix {
+		p[i%4] = rp
 
 		if i%4 == 3 {
 			y, u, v := rgbToYUV(p[0], p[1], p[2])
@@ -135,19 +136,18 @@ func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
 
 			x := (i+1)/4 - 1
 
-			yuv[x] = make([]float32, 3)
+			yuvs[x] = make([]float32, 3)
 
-			yuv[x][0] = y
-			yuv[x][1] = u
-			yuv[x][2] = v
-
+			yuvs[x][0] = y
+			yuvs[x][1] = u
+			yuvs[x][2] = v
 		}
 	}
 
 	rgb := image.NewNRGBA(ref.Bounds())
 
-	for i := 0; i < len(yuv); i++ {
-		r, g, b := yuvToRGB(yuv[i][0], yuv[i][1], yuv[i][2])
+	for i, yuv := range yuvs {
+		r, g, b := yuvToRGB(yuv[0], yuv[1], yuv[2])
 		rgb.Pix[i*4] = r
 		rgb.Pix[i*4+1] = g
 		rgb.Pix[i*4+2] = b
