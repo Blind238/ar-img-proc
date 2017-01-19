@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+
+	"github.com/Blind238/arimgproc/colconv"
 )
 
 var ref *image.NRGBA
@@ -91,7 +93,7 @@ func yuvHandler(w http.ResponseWriter, req *http.Request) {
 		p[i%4] = rp
 
 		if i%4 == 3 {
-			y, u, v := rgbToYUV(p[0], p[1], p[2])
+			y, u, v := colconv.RgbToYUV(p[0], p[1], p[2])
 
 			x := (i+1)/4 - 1
 
@@ -106,7 +108,7 @@ func yuvHandler(w http.ResponseWriter, req *http.Request) {
 	rgb := image.NewNRGBA(ref.Bounds())
 
 	for i, yuv := range yuvs {
-		r, g, b := yuvToRGB(yuv[0], yuv[1], yuv[2])
+		r, g, b := colconv.YuvToRGB(yuv[0], yuv[1], yuv[2])
 		rgb.Pix[i*4] = r
 		rgb.Pix[i*4+1] = g
 		rgb.Pix[i*4+2] = b
@@ -129,7 +131,7 @@ func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
 		p[i%4] = rp
 
 		if i%4 == 3 {
-			y, u, v := rgbToYUV(p[0], p[1], p[2])
+			y, u, v := colconv.RgbToYUV(p[0], p[1], p[2])
 
 			u = 0
 			v = 0
@@ -147,7 +149,7 @@ func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
 	rgb := image.NewNRGBA(ref.Bounds())
 
 	for i, yuv := range yuvs {
-		r, g, b := yuvToRGB(yuv[0], yuv[1], yuv[2])
+		r, g, b := colconv.YuvToRGB(yuv[0], yuv[1], yuv[2])
 		rgb.Pix[i*4] = r
 		rgb.Pix[i*4+1] = g
 		rgb.Pix[i*4+2] = b
@@ -158,40 +160,6 @@ func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func rgbToYUV(r uint8, g uint8, b uint8) (y float32, u float32, v float32) {
-	// define constants
-	var rconst float32 = 0.299
-	var gconst float32 = 0.587
-	var bconst float32 = 0.114
-	var uMax float32 = 0.436
-	var vMax float32 = 0.615
-
-	rf := float32(r) / 255
-	gf := float32(g) / 255
-	bf := float32(b) / 255
-
-	y = rconst*rf + gconst*gf + bconst*bf
-
-	y = clampAbsf(y, 1)
-
-	u = 0.492 * (float32(bf) - y)
-	v = 0.877 * (float32(rf) - y)
-
-	u = clampAbsf(u, uMax)
-	v = clampAbsf(v, vMax)
-
-	return y, u, v
-}
-
-func yuvToRGB(y float32, u float32, v float32) (r uint8, g uint8, b uint8) {
-
-	r = uint8((y + 1.14*v) * 255)
-	g = uint8((y - 0.395*u - 0.581*v) * 255)
-	b = uint8((y + 2.033*u) * 255)
-
-	return r, g, b
 }
 
 func writePng(w http.ResponseWriter, m image.Image) error {
@@ -213,17 +181,4 @@ func writePng(w http.ResponseWriter, m image.Image) error {
 	}
 
 	return nil
-}
-
-func clampAbsf(f float32, limit float32) float32 {
-	if limit < 0 {
-		limit *= -1
-	}
-
-	if f > limit {
-		f = limit
-	} else if f < -limit {
-		f = -limit
-	}
-	return f
 }
