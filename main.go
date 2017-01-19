@@ -174,13 +174,13 @@ func rgbToYUV(r uint8, g uint8, b uint8) (y float32, u float32, v float32) {
 
 	y = rconst*rf + gconst*gf + bconst*bf
 
-	y = clampf(y, 1)
+	y = clampAbsf(y, 1)
 
 	u = 0.492 * (float32(bf) - y)
 	v = 0.877 * (float32(rf) - y)
 
-	u = clampf(u, uMax)
-	v = clampf(v, vMax)
+	u = clampAbsf(u, uMax)
+	v = clampAbsf(v, vMax)
 
 	return y, u, v
 }
@@ -215,7 +215,7 @@ func writePng(w http.ResponseWriter, m image.Image) error {
 	return nil
 }
 
-func clampf(f float32, limit float32) float32 {
+func clampAbsf(f float32, limit float32) float32 {
 	if limit < 0 {
 		limit *= -1
 	}
