@@ -4,26 +4,33 @@
     <meta charset="UTF-8">
     <title>Images</title>
     <style>
-       body {
-           padding: 0;
-           margin: 0;
-       }
+        * {
+            box-sizing: border-box;
+        }
 
-       .container {
-           display: flex;
-           max-width: 60em;
-       }
+        body {
+            padding: 0;
+            margin: 0;
+            font-family: sans-serif;
+        }
 
-       .image {
-           flex: auto;
-       }
+        .container {
+            display: flex;
+            align-items: flex-end;
+            max-width: 60em;
+        }
 
-       img {
-           -ms-interpolation-mode: nearest-neighbor; /* IE7+ non-standard*/
-           image-rendering: -moz-crisp-edges; /* Firefox */
-           image-rendering: pixelated; /* Chrome */
-           width: 100%;
-       }
+        .image {
+            flex: 1;
+        }
+
+        img {
+            -ms-interpolation-mode: nearest-neighbor; /* IE7+ non-standard*/
+            image-rendering: -moz-crisp-edges; /* Firefox */
+            image-rendering: pixelated; /* Chrome */
+            border: 2px dashed gray;
+            width: 100%;
+        }
      
     </style>
 </head>
@@ -31,30 +38,41 @@
     <h1>Grayscale</h1>
     <div class="container">
         <div class="image">
+            <h2>Original</h2>
             <img src="reference">
         </div>
         <div class="image">
+            <h2>Converted</h2>
             <img src="grayscale">
         </div>
     </div>
     <h1>YUV</h1>
     <div class="container">
         <div class="image">
+            <h2>Original RGB</h2>
             <img src="reference">
         </div>
         <div class="image">
+            <h2>Converted to YUV</h2>
             <img src="yuv">
         </div>
         <div class="image">
+            <h2>YUV without UV (grayscale result)</h2>
             <img src="yuvgray">
         </div>
     </div>
     <h1>Interpolation</h1>
     <div class="container">
         <div class="image">
+            <h2>Original</h2>
             <img src="reference">
         </div>
         <div class="image">
+            <h2>Smaller</h2>
+            <img src="interpolation">
+        </div>
+        <div class="image">
+            <h2>Larger</h2>
             <img src="interpolation">
         </div>
     </div>
