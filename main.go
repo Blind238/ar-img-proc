@@ -11,8 +11,10 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"math"
+	"math/rand"
 
 	"github.com/Blind238/arimgproc/colconv"
 	"github.com/Blind238/arimgproc/interpolate"
@@ -250,7 +252,7 @@ func (v *vector) length() float64 {
 	return math.Sqrt(math.Pow(2, v.r) + math.Pow(2, v.g) + math.Pow(2, v.b))
 }
 
-func (v *vector) distance(v1, v2 vector) float64 {
+func vectorDistance(v1, v2 vector) float64 {
 	return math.Sqrt(math.Pow(2, v1.r-v2.r) + math.Pow(2, v1.g-v2.g) + math.Pow(2, v1.b-v2.b))
 }
 
@@ -262,7 +264,7 @@ func (v *vector) scalarProduct(p float64) vector {
 	}
 }
 
-func (v *vector) sum(v1, v2 vector) vector {
+func vectorSum(v1, v2 vector) vector {
 	return vector{
 		r: v1.r + v2.r,
 		g: v1.g + v2.g,
@@ -270,12 +272,120 @@ func (v *vector) sum(v1, v2 vector) vector {
 	}
 }
 
-func kmeansHandler(w http.ResponseWriter, r *http.Request) {
+type cluster struct {
+	position vector
+	v        []vectorPos
+}
 
-	err := writeImg(w, ref)
+type vectorPos struct {
+	r float64
+	g float64
+	b float64
+	x int
+	y int
+}
+
+func (v *vectorPos) toVector() vector {
+	return vector{
+		r: v.r,
+		g: v.g,
+		b: v.b,
+	}
+}
+
+func kmeansHandler(w http.ResponseWriter, r *http.Request) {
+	objects := make([]vectorPos, ref.Bounds().Dx()*ref.Bounds().Dy())
+	clusters := make([]cluster, 5)
+
+	var o int
+	for x := 0; x < ref.Bounds().Dx(); x++ {
+		for y := 0; y < ref.Bounds().Dy(); y++ {
+			pixOrigin := ref.PixOffset(x, y)
+			pixs := ref.Pix[pixOrigin : pixOrigin+4]
+			v := colorToVector(pixs[0], pixs[1], pixs[2])
+
+			objects[o] = vectorPos{
+				r: v.r,
+				g: v.g,
+				b: v.b,
+				x: x,
+				y: y,
+			}
+			o++
+		}
+	}
+
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := 0; i < 5; i++ {
+		clusters[i].position = objects[rand.Intn(ref.Bounds().Dx()*ref.Bounds().Dy())].toVector()
+	}
+
+	kmeans(&objects, &clusters)
+	kmeans(&objects, &clusters)
+
+	meaned := image.NewNRGBA(ref.Bounds())
+
+	for _, c := range clusters {
+
+		for _, o := range c.v {
+			pixOrigin := meaned.PixOffset(o.x, o.y)
+			pixs := meaned.Pix[pixOrigin : pixOrigin+4]
+			pixs[0], pixs[1], pixs[2] = vectorToColor(c.position)
+			pixs[3] = 255
+		}
+	}
+
+	err := writeImg(w, meaned)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func kmeans(objects *[]vectorPos, clusters *[]cluster) {
+	// reset cluster collection
+	for _, c := range *clusters {
+		c.v = make([]vectorPos, 0)
+	}
+
+	for _, v := range *objects {
+		var closest int
+		var n float64
+
+		for j, c := range *clusters {
+			vv := vector{r: v.r, g: v.g, b: v.b}
+			d := math.Pow(2, vectorDistance(vv, c.position))
+
+			if d > n {
+
+			} else {
+				n = d
+				closest = j
+			}
+		}
+
+		(*clusters)[closest].v = append((*clusters)[closest].v, v)
+	}
+
+	for _, c := range *clusters {
+		var sum vector
+		for _, v := range c.v {
+			sum = vectorSum(sum, v.toVector())
+		}
+		l := len(c.v)
+		c.position = sum.scalarProduct(1 / float64(l))
+	}
+}
+
+func colorToVector(r, g, b uint8) vector {
+	return vector{
+		r: float64(r) / 255,
+		g: float64(g) / 255,
+		b: float64(b) / 255,
+	}
+}
+
+func vectorToColor(v vector) (r, g, b uint8) {
+	return uint8(v.r * 255), uint8(v.g * 255), uint8(v.b * 255)
 }
 
 func writeImg(w http.ResponseWriter, m image.Image) error {
