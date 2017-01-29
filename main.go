@@ -12,6 +12,8 @@ import (
 	"os"
 	"strconv"
 
+	"math"
+
 	"github.com/Blind238/arimgproc/colconv"
 	"github.com/Blind238/arimgproc/interpolate"
 )
@@ -47,6 +49,7 @@ func main() {
 	http.HandleFunc("/yuvgray", yuvGrayHandler)
 	http.HandleFunc("/downscale", downscaleHandler)
 	http.HandleFunc("/upscale", upscaleHandler)
+	http.HandleFunc("/kmeans", kmeansHandler)
 	http.HandleFunc("/", handler)
 
 	if p, ok := os.LookupEnv("PORT"); ok {
@@ -235,6 +238,44 @@ func scaleBounds(r image.Rectangle, f float64) image.Rectangle {
 	sr := image.Rectangle{image.ZP, image.Point{sw, sh}}
 
 	return sr
+}
+
+type vector struct {
+	r float64
+	g float64
+	b float64
+}
+
+func (v *vector) length() float64 {
+	return math.Sqrt(math.Pow(2, v.r) + math.Pow(2, v.g) + math.Pow(2, v.b))
+}
+
+func (v *vector) distance(v1, v2 vector) float64 {
+	return math.Sqrt(math.Pow(2, v1.r-v2.r) + math.Pow(2, v1.g-v2.g) + math.Pow(2, v1.b-v2.b))
+}
+
+func (v *vector) scalarProduct(p float64) vector {
+	return vector{
+		r: v.r * p,
+		g: v.g * p,
+		b: v.b * p,
+	}
+}
+
+func (v *vector) sum(v1, v2 vector) vector {
+	return vector{
+		r: v1.r + v2.r,
+		g: v1.g + v2.g,
+		b: v1.b + v2.b,
+	}
+}
+
+func kmeansHandler(w http.ResponseWriter, r *http.Request) {
+
+	err := writeImg(w, ref)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func writeImg(w http.ResponseWriter, m image.Image) error {
