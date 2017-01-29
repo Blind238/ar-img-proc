@@ -46,8 +46,14 @@ func main() {
 	http.HandleFunc("/yuvgray", yuvGrayHandler)
 	http.HandleFunc("/", handler)
 
-	fmt.Println("Serving on :8080")
-	err = http.ListenAndServe(":8080", nil)
+	if p, ok := os.LookupEnv("PORT"); ok {
+		fmt.Println("arimgproc serving on :" + p + " due to PORT env")
+		err = http.ListenAndServe(":"+p, nil)
+	} else {
+		fmt.Println("arimgproc serving on :8080")
+		err = http.ListenAndServe(":8080", nil)
+	}
+
 	if err != nil {
 		log.Fatal(err)
 	}
