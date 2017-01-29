@@ -44,6 +44,8 @@ func main() {
 	http.HandleFunc("/grayscale", grayHandler)
 	http.HandleFunc("/yuv", yuvHandler)
 	http.HandleFunc("/yuvgray", yuvGrayHandler)
+	http.HandleFunc("/downscale", downscaleHandler)
+	http.HandleFunc("/upscale", upscaleHandler)
 	http.HandleFunc("/", handler)
 
 	if p, ok := os.LookupEnv("PORT"); ok {
@@ -179,6 +181,75 @@ func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func downscaleHandler(w http.ResponseWriter, r *http.Request) {
+	s := scale(ref, 0.3)
+
+	err := writeImg(w, s)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func upscaleHandler(w http.ResponseWriter, r *http.Request) {
+	s := scale(ref, 1.8)
+
+	err := writeImg(w, s)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func scale(src image.Image, f float32) image.Image {
+	b := src.Bounds()
+
+	scaledB := image.Rect(0, 0, int(float32(b.Dx())*f), int(float32(b.Dy())*f))
+
+	var target image.Image = image.NewNRGBA(scaledB)
+
+	s := *src.(*image.NRGBA)
+	t := *target.(*image.NRGBA)
+
+	x := scaledB.Dx()
+	y := scaledB.Dy()
+
+	for xi := 0; xi < x; xi++ {
+
+		for yi := 0; yi < y; yi++ {
+			interpolateNearest(&s, &t, xi, yi, f)
+		}
+
+	}
+
+	return target
+}
+
+func interpolateNearest(src, target *image.NRGBA, x, y int, f float32) {
+	xd := roundf(float32(x) / f)
+	yd := roundf(float32(y) / f)
+
+	target.Set(x, y, src.At(xd, yd))
+}
+
+func interpolateBilinear(src, target *image.NRGBA, x, y int, f float32) {
+
+}
+
+func interpolateBicubic(src, target *image.NRGBA, x, y int, f float32) {
+
+}
+
+func scaleBounds(r image.Rectangle, f float32) image.Rectangle {
+	w := r.Max.X - r.Min.X
+	h := r.Max.Y - r.Min.Y
+
+	sw := int(float32(w) * f)
+	sh := int(float32(h) * f)
+
+	sr := image.Rectangle{image.ZP, image.Point{sw, sh}}
+
+	return sr
+}
+
 func writeImg(w http.ResponseWriter, m image.Image) error {
 	var err error
 
@@ -241,4 +312,11 @@ func writeJpeg(w http.ResponseWriter, m image.Image) error {
 	}
 
 	return nil
+}
+
+func roundf(f float32) int {
+	if f > 0 {
+		return int(f + 0.5)
+	}
+	return int(f - 0.5)
 }
