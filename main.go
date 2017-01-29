@@ -105,7 +105,7 @@ func grayHandler(w http.ResponseWriter, r *http.Request) {
 func yuvHandler(w http.ResponseWriter, req *http.Request) {
 	// convert to YUV and back again (and be able to change Y value)
 
-	yuvs := make([][]float32, len(ref.Pix)/4)
+	yuvs := make([][]float64, len(ref.Pix)/4)
 	p := make([]uint8, 4)
 
 	for i, rp := range ref.Pix {
@@ -116,7 +116,7 @@ func yuvHandler(w http.ResponseWriter, req *http.Request) {
 
 			x := (i+1)/4 - 1
 
-			yuvs[x] = make([]float32, 3)
+			yuvs[x] = make([]float64, 3)
 
 			yuvs[x][0] = y
 			yuvs[x][1] = u
@@ -143,7 +143,7 @@ func yuvHandler(w http.ResponseWriter, req *http.Request) {
 func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
 	// convert to YUV and back again (and be able to change Y value)
 
-	yuvs := make([][]float32, len(ref.Pix)/4)
+	yuvs := make([][]float64, len(ref.Pix)/4)
 	p := make([]uint8, 4)
 
 	for i, rp := range ref.Pix {
@@ -157,7 +157,7 @@ func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
 
 			x := (i+1)/4 - 1
 
-			yuvs[x] = make([]float32, 3)
+			yuvs[x] = make([]float64, 3)
 
 			yuvs[x][0] = y
 			yuvs[x][1] = u
@@ -199,10 +199,10 @@ func upscaleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func scale(src image.Image, f float32) image.Image {
+func scale(src image.Image, f float64) image.Image {
 	b := src.Bounds()
 
-	scaledB := image.Rect(0, 0, int(float32(b.Dx())*f), int(float32(b.Dy())*f))
+	scaledB := image.Rect(0, 0, int(float64(b.Dx())*f), int(float64(b.Dy())*f))
 
 	var target image.Image = image.NewNRGBA(scaledB)
 
@@ -223,27 +223,27 @@ func scale(src image.Image, f float32) image.Image {
 	return target
 }
 
-func interpolateNearest(src, target *image.NRGBA, x, y int, f float32) {
-	xd := roundf(float32(x) / f)
-	yd := roundf(float32(y) / f)
+func interpolateNearest(src, target *image.NRGBA, x, y int, f float64) {
+	xd := roundf(float64(x) / f)
+	yd := roundf(float64(y) / f)
 
 	target.Set(x, y, src.At(xd, yd))
 }
 
-func interpolateBilinear(src, target *image.NRGBA, x, y int, f float32) {
+func interpolateBilinear(src, target *image.NRGBA, x, y int, f float64) {
 
 }
 
-func interpolateBicubic(src, target *image.NRGBA, x, y int, f float32) {
+func interpolateBicubic(src, target *image.NRGBA, x, y int, f float64) {
 
 }
 
-func scaleBounds(r image.Rectangle, f float32) image.Rectangle {
+func scaleBounds(r image.Rectangle, f float64) image.Rectangle {
 	w := r.Max.X - r.Min.X
 	h := r.Max.Y - r.Min.Y
 
-	sw := int(float32(w) * f)
-	sh := int(float32(h) * f)
+	sw := int(float64(w) * f)
+	sh := int(float64(h) * f)
 
 	sr := image.Rectangle{image.ZP, image.Point{sw, sh}}
 
@@ -314,7 +314,7 @@ func writeJpeg(w http.ResponseWriter, m image.Image) error {
 	return nil
 }
 
-func roundf(f float32) int {
+func roundf(f float64) int {
 	if f > 0 {
 		return int(f + 0.5)
 	}
