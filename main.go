@@ -249,11 +249,11 @@ type vector struct {
 }
 
 func (v *vector) length() float64 {
-	return math.Sqrt(math.Pow(2, v.r) + math.Pow(2, v.g) + math.Pow(2, v.b))
+	return math.Sqrt(math.Pow(v.r, 2) + math.Pow(v.g, 2) + math.Pow(v.b, 2))
 }
 
 func vectorDistance(v1, v2 vector) float64 {
-	return math.Sqrt(math.Pow(2, v1.r-v2.r) + math.Pow(2, v1.g-v2.g) + math.Pow(2, v1.b-v2.b))
+	return math.Sqrt(math.Pow(v1.r-v2.r, 2) + math.Pow(v1.g-v2.g, 2) + math.Pow(v1.b-v2.b, 2))
 }
 
 func (v *vector) scalarProduct(p float64) vector {
@@ -294,14 +294,18 @@ func (v *vectorPos) toVector() vector {
 }
 
 func kmeansHandler(w http.ResponseWriter, r *http.Request) {
-	objects := make([]vectorPos, ref.Bounds().Dx()*ref.Bounds().Dy())
-	clusters := make([]cluster, 5)
+	kref := scale(ref, 0.3).(*image.NRGBA)
+
+	clustAmount := 15
+
+	objects := make([]vectorPos, kref.Bounds().Dx()*kref.Bounds().Dy())
+	clusters := make([]cluster, clustAmount)
 
 	var o int
-	for x := 0; x < ref.Bounds().Dx(); x++ {
-		for y := 0; y < ref.Bounds().Dy(); y++ {
-			pixOrigin := ref.PixOffset(x, y)
-			pixs := ref.Pix[pixOrigin : pixOrigin+4]
+	for x := 0; x < kref.Bounds().Dx(); x++ {
+		for y := 0; y < kref.Bounds().Dy(); y++ {
+			pixOrigin := kref.PixOffset(x, y)
+			pixs := kref.Pix[pixOrigin : pixOrigin+4]
 			v := colorToVector(pixs[0], pixs[1], pixs[2])
 
 			objects[o] = vectorPos{
@@ -316,17 +320,19 @@ func kmeansHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rand.New(rand.NewSource(time.Now().UnixNano()))
-	for i := 0; i < 5; i++ {
-		clusters[i].position = objects[rand.Intn(ref.Bounds().Dx()*ref.Bounds().Dy())].toVector()
+	for i := 0; i < clustAmount; i++ {
+		r := rand.Intn(len(objects))
+		clusters[i].position = objects[r].toVector()
 	}
 
-	kmeans(&objects, &clusters)
-	kmeans(&objects, &clusters)
+	// TODO: track if there are any reassignments and stop iterating
+	for i := 0; i < 10; i++ {
+		kmeans(&objects, &clusters)
+	}
 
-	meaned := image.NewNRGBA(ref.Bounds())
+	meaned := image.NewNRGBA(kref.Bounds())
 
 	for _, c := range clusters {
-
 		for _, o := range c.v {
 			pixOrigin := meaned.PixOffset(o.x, o.y)
 			pixs := meaned.Pix[pixOrigin : pixOrigin+4]
@@ -348,20 +354,7 @@ func kmeans(objects *[]vectorPos, clusters *[]cluster) {
 	}
 
 	for _, v := range *objects {
-		var closest int
-		var n float64
-
-		for j, c := range *clusters {
-			vv := vector{r: v.r, g: v.g, b: v.b}
-			d := math.Pow(2, vectorDistance(vv, c.position))
-
-			if d > n {
-
-			} else {
-				n = d
-				closest = j
-			}
-		}
+		closest := getClosest(&v, clusters)
 
 		(*clusters)[closest].v = append((*clusters)[closest].v, v)
 	}
@@ -372,8 +365,29 @@ func kmeans(objects *[]vectorPos, clusters *[]cluster) {
 			sum = vectorSum(sum, v.toVector())
 		}
 		l := len(c.v)
+
 		c.position = sum.scalarProduct(1 / float64(l))
 	}
+}
+
+func getClosest(o *vectorPos, cs *[]cluster) int {
+	v := o.toVector()
+	var n float64
+	var closest int
+	for i, c := range *cs {
+		d := math.Pow(vectorDistance(v, c.position), 2)
+
+		if n == 0 {
+			n = d
+			closest = i
+		}
+		if d < n {
+			n = d
+			closest = i
+		}
+	}
+
+	return closest
 }
 
 func colorToVector(r, g, b uint8) vector {
