@@ -81,7 +81,7 @@ func refHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := writeImg(w, ref)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
@@ -108,7 +108,7 @@ func grayHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := writeImg(w, g)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
@@ -146,7 +146,7 @@ func yuvHandler(w http.ResponseWriter, req *http.Request) {
 
 	err := writeImg(w, rgb)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
@@ -187,7 +187,7 @@ func yuvGrayHandler(w http.ResponseWriter, req *http.Request) {
 
 	err := writeImg(w, rgb)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
@@ -196,7 +196,7 @@ func downscaleHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := writeImg(w, s)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
@@ -205,7 +205,7 @@ func upscaleHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := writeImg(w, s)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
@@ -252,20 +252,20 @@ type vector struct {
 	b float64
 }
 
-func (v *vector) length() float64 {
+func (v vector) length() float64 {
 	return math.Sqrt(math.Pow(v.r, 2) + math.Pow(v.g, 2) + math.Pow(v.b, 2))
 }
 
-func vectorDistance(v1, v2 vector) float64 {
-	return math.Sqrt(math.Pow(v1.r-v2.r, 2) + math.Pow(v1.g-v2.g, 2) + math.Pow(v1.b-v2.b, 2))
-}
-
-func (v *vector) scalarProduct(p float64) vector {
+func (v vector) scalarProduct(p float64) vector {
 	return vector{
 		r: v.r * p,
 		g: v.g * p,
 		b: v.b * p,
 	}
+}
+
+func vectorDistance(v1, v2 vector) float64 {
+	return math.Sqrt(math.Pow(v1.r-v2.r, 2) + math.Pow(v1.g-v2.g, 2) + math.Pow(v1.b-v2.b, 2))
 }
 
 func vectorSum(v1, v2 vector) vector {
@@ -287,10 +287,10 @@ type vectorPos struct {
 	b       float64
 	x       int
 	y       int
-	cluster *cluster
+	cluster int
 }
 
-func (v *vectorPos) toVector() vector {
+func (v vectorPos) toVector() vector {
 	return vector{
 		r: v.r,
 		g: v.g,
@@ -340,7 +340,7 @@ func kmeansHandler(w http.ResponseWriter, r *http.Request) {
 	if changed {
 		fmt.Println("k-means reached max:", ii)
 	} else {
-		fmt.Println("k-means ended early:", ii)
+		fmt.Println("k-means solved after:", ii)
 	}
 
 	meaned := image.NewNRGBA(kref.Bounds())
@@ -355,7 +355,7 @@ func kmeansHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := writeImg(w, meaned)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
@@ -442,9 +442,9 @@ func scanSection(o *[]vectorPos, cs *[]cluster, wha int) work {
 	for i, v := range *o {
 		closest := getClosest(&v, cs)
 
-		if v.cluster != &(*cs)[closest] {
+		if v.cluster != closest {
 			changed = true
-			(*o)[i].cluster = &(*cs)[closest]
+			(*o)[i].cluster = closest
 		}
 
 		vs[closest] = append(vs[closest], v)
