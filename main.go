@@ -16,6 +16,8 @@ import (
 	"math"
 	"math/rand"
 
+	"runtime"
+
 	"github.com/Blind238/arimgproc/colconv"
 	"github.com/Blind238/arimgproc/interpolate"
 )
@@ -44,6 +46,8 @@ func main() {
 
 	ref = nm
 	// ref = m.(*image.NRGBA)
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	http.HandleFunc("/reference", refHandler)
 	http.HandleFunc("/grayscale", grayHandler)
@@ -278,11 +282,12 @@ type cluster struct {
 }
 
 type vectorPos struct {
-	r float64
-	g float64
-	b float64
-	x int
-	y int
+	r       float64
+	g       float64
+	b       float64
+	x       int
+	y       int
+	cluster *cluster
 }
 
 func (v *vectorPos) toVector() vector {
@@ -296,7 +301,7 @@ func (v *vectorPos) toVector() vector {
 func kmeansHandler(w http.ResponseWriter, r *http.Request) {
 	kref := scale(ref, 0.3).(*image.NRGBA)
 
-	clustAmount := 15
+	clustAmount := 5
 
 	objects := make([]vectorPos, kref.Bounds().Dx()*kref.Bounds().Dy())
 	clusters := make([]cluster, clustAmount)
@@ -325,13 +330,20 @@ func kmeansHandler(w http.ResponseWriter, r *http.Request) {
 		clusters[i].position = objects[r].toVector()
 	}
 
-	// TODO: track if there are any reassignments and stop iterating
-	for i := 0; i < 10; i++ {
-		kmeans(&objects, &clusters)
+	changed := true
+	ii := 0
+
+	for ; changed && ii < 100; ii++ {
+		changed = kmeans(&objects, &clusters)
+	}
+
+	if changed {
+		fmt.Println("k-means reached max:", ii)
+	} else {
+		fmt.Println("k-means ended early:", ii)
 	}
 
 	meaned := image.NewNRGBA(kref.Bounds())
-
 	for _, c := range clusters {
 		for _, o := range c.v {
 			pixOrigin := meaned.PixOffset(o.x, o.y)
@@ -347,26 +359,101 @@ func kmeansHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func kmeans(objects *[]vectorPos, clusters *[]cluster) {
+type work struct {
+	id      int
+	result  [][]vectorPos
+	changed bool
+}
+
+func kmeans(objects *[]vectorPos, clusters *[]cluster) bool {
+	changed := false
+
 	// reset cluster collection
-	for _, c := range *clusters {
-		c.v = make([]vectorPos, 0)
+	for i := range *clusters {
+		(*clusters)[i].v = make([]vectorPos, 0)
 	}
 
-	for _, v := range *objects {
-		closest := getClosest(&v, clusters)
+	numCPU := runtime.GOMAXPROCS(0)
+	o := len(*objects)
+	sectionLength := int(math.Floor(float64(o) / float64(numCPU)))
 
-		(*clusters)[closest].v = append((*clusters)[closest].v, v)
+	c := make(chan work)
+
+	for i := 0; i < numCPU; i++ {
+		var section []vectorPos
+		section = (*objects)
+		i := i
+		if i == numCPU-1 {
+			sl := i * sectionLength
+			sec := section[sl:]
+
+			go func() {
+				c <- scanSection(&sec, clusters, i)
+			}()
+		} else {
+			sl1 := i * sectionLength
+			sl2 := (i+1)*sectionLength - 1
+			sec := section[sl1:sl2]
+
+			go func() {
+				c <- scanSection(&sec, clusters, i)
+			}()
+		}
 	}
 
-	for _, c := range *clusters {
+	results := make([][]vectorPos, len(*clusters))
+
+	for i := 0; i < numCPU; i++ {
+		w := <-c
+		// fmt.Println("received", w.id)
+
+		for j := range w.result {
+			results[j] = append(results[j], w.result[j]...)
+		}
+
+		if w.changed {
+			changed = true
+		}
+	}
+
+	for i := range results {
+		(*clusters)[i].v = append((*clusters)[i].v, results[i]...)
+	}
+
+	for i, c := range *clusters {
 		var sum vector
 		for _, v := range c.v {
 			sum = vectorSum(sum, v.toVector())
 		}
 		l := len(c.v)
 
-		c.position = sum.scalarProduct(1 / float64(l))
+		(*clusters)[i].position = sum.scalarProduct(1 / float64(l))
+	}
+
+	return changed
+}
+
+func scanSection(o *[]vectorPos, cs *[]cluster, wha int) work {
+
+	changed := false
+	vs := make([][]vectorPos, len(*cs))
+	// first dimension is cluster, second dimension is for vectors
+
+	for i, v := range *o {
+		closest := getClosest(&v, cs)
+
+		if v.cluster != &(*cs)[closest] {
+			changed = true
+			(*o)[i].cluster = &(*cs)[closest]
+		}
+
+		vs[closest] = append(vs[closest], v)
+	}
+
+	return work{
+		id:      wha,
+		result:  vs,
+		changed: changed,
 	}
 }
 
