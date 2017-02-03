@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Images</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            padding: 0;
+            margin: 0;
+            font-family: sans-serif;
+            color: hsl(0, 0%, 16%);
+        }
+
+        .container {
+            display: flex;
+            align-items: flex-end;
+            max-width: 60em;
+        }
+
+        .image {
+            flex: 1;
+        }
+
+        img {
+            -ms-interpolation-mode: nearest-neighbor; /* IE7+ non-standard*/
+            image-rendering: -moz-crisp-edges; /* Firefox */
+            image-rendering: pixelated; /* Chrome */
+            border: 2px dashed gray;
+            width: 100%;
+        }
+     
+    </style>
+</head>
+<body>
+    <h1>Excercise 1</h1>
+    <div class="container">
+        <div class="image">
+            <h2>Original</h2>
+            <a href="/reference"><img src="/reference"></a>
+        </div>
+        <div class="image">
+            <h2>Greenscale</h2>
+            <a href="/greenscale"><img src="/greenscale"></a>
+        </div>
+    </div>
+    <h1>Excercise 2</h1>
+    <div class="container">
+        <div class="image">
+            <h2>Original</h2>
+            <a href="/reference"><img src="/reference"></a>
+        </div>
+        <div class="image">
+            <h2>Zoomed</h2>
+            <a href="/zoom"><img src="/zoom"></a>
+        </div>
+    </div>
+    <h1>Excercise 3</h1>
+    <div class="container">
+        <div class="image">
+            <h2>Original</h2>
+            <a href="/reference"><img src="/reference"></a>
+        </div>
+        <div class="image">
+            <h2>Highlight border</h2>
+            <a href="/highlight"><img src="/highlight"></a>
+        </div>
+    </div>
+</body>
+</html>

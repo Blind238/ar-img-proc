@@ -19,17 +19,39 @@ import (
 	"runtime"
 
 	"github.com/Blind238/arimgproc/colconv"
+	"github.com/Blind238/arimgproc/exam"
 	"github.com/Blind238/arimgproc/interpolate"
 )
 
 var ref *image.NRGBA
+var examRef *image.NRGBA
 var refFormat string
+var examRefFormat string
 
 func main() {
 	f, err := os.Open("images/forest.jpg")
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// EXAM load image
+	ex, err := os.Open("images/forest.jpg")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	em, format, err := image.Decode(ex)
+	examRefFormat = format
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	eb := em.Bounds()
+	enm := image.NewNRGBA(image.Rect(0, 0, eb.Dx(), eb.Dy()))
+	draw.Draw(enm, enm.Bounds(), em, eb.Min, draw.Src)
+
+	examRef = enm
+	// end EXAM
 
 	m, format, err := image.Decode(f)
 	refFormat = format
@@ -56,6 +78,12 @@ func main() {
 	http.HandleFunc("/downscale", downscaleHandler)
 	http.HandleFunc("/upscale", upscaleHandler)
 	http.HandleFunc("/kmeans", kmeansHandler)
+	// EXAM handlers
+	http.HandleFunc("/greenscale", greenscaleHandler)
+	http.HandleFunc("/zoom", zoomHandler)
+	http.HandleFunc("/highlight", highlightHandler)
+	http.HandleFunc("/exam", examHandler)
+	// end EXAM
 	http.HandleFunc("/", handler)
 
 	if p, ok := os.LookupEnv("PORT"); ok {
@@ -552,3 +580,183 @@ func writeJpeg(w http.ResponseWriter, m image.Image) error {
 
 	return nil
 }
+
+// EXAM handler functions
+func examHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	http.ServeFile(w, r, "exam.html")
+}
+
+func greenscaleHandler(w http.ResponseWriter, r *http.Request) {
+
+	greenscaled := exam.Greenscale(examRef)
+
+	err := writeImg(w, greenscaled)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func zoomHandler(w http.ResponseWriter, r *http.Request) {
+	xMin := 50
+	xMax := 500
+	yMin := 30
+	yMax := 300
+	rect := image.Rect(xMin, yMin, xMax, yMax)
+
+	zoomLevel := 2.0
+
+	zoomed := exam.Zoom(examRef, rect, zoomLevel)
+
+	err := writeImg(w, zoomed)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func highlightHandler(w http.ResponseWriter, r *http.Request) {
+	kref := scale(ref, 0.3).(*image.NRGBA)
+	highlightColor := [3]uint8{255, 0, 0}
+
+	clustAmount := 3
+
+	objects := make([]vectorPos, kref.Bounds().Dx()*kref.Bounds().Dy())
+	clusters := make([]cluster, clustAmount)
+
+	var o int
+	for x := 0; x < kref.Bounds().Dx(); x++ {
+		for y := 0; y < kref.Bounds().Dy(); y++ {
+			pixOrigin := kref.PixOffset(x, y)
+			pixs := kref.Pix[pixOrigin : pixOrigin+4]
+			v := colorToVector(pixs[0], pixs[1], pixs[2])
+
+			objects[o] = vectorPos{
+				r: v.r,
+				g: v.g,
+				b: v.b,
+				x: x,
+				y: y,
+			}
+			o++
+		}
+	}
+
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := 0; i < clustAmount; i++ {
+		r := rand.Intn(len(objects))
+		clusters[i].position = objects[r].toVector()
+	}
+
+	changed := true
+	ii := 0
+
+	for ; changed && ii < 100; ii++ {
+		changed = kmeans(&objects, &clusters)
+	}
+
+	if changed {
+		fmt.Println("k-means reached max:", ii)
+	} else {
+		fmt.Println("k-means solved after:", ii)
+	}
+
+	meaned := image.NewNRGBA(kref.Bounds())
+
+	//first draw means
+	for _, c := range clusters {
+		for _, o := range c.v {
+			pixOrigin := meaned.PixOffset(o.x, o.y)
+			pixs := meaned.Pix[pixOrigin : pixOrigin+4]
+			pixs[0], pixs[1], pixs[2] = vectorToColor(c.position)
+			pixs[3] = 255
+		}
+	}
+
+	oo := 0
+	for x := 0; x < kref.Bounds().Dx(); x++ {
+		for y := 0; y < kref.Bounds().Dy(); y++ {
+			pixOrigin := meaned.PixOffset(x, y)
+			pixs := meaned.Pix[pixOrigin : pixOrigin+4]
+
+			pn := objects[getObjectIndexFromCoords(objects, kref.Bounds(), x, y-1)]
+			ps := objects[getObjectIndexFromCoords(objects, kref.Bounds(), x, y+1)]
+			pe := objects[getObjectIndexFromCoords(objects, kref.Bounds(), x+1, y)]
+			pw := objects[getObjectIndexFromCoords(objects, kref.Bounds(), x-1, y)]
+
+			neighbours := make([]vectorPos, 4)
+
+			neighbours[0] = pn
+			neighbours[1] = ps
+			neighbours[2] = pe
+			neighbours[3] = pw
+
+			different := false
+			for _, n := range neighbours {
+				if n.cluster != objects[oo].cluster {
+					different = true
+				}
+			}
+
+			if different {
+				pixs[0] = highlightColor[0]
+				pixs[1] = highlightColor[1]
+				pixs[2] = highlightColor[2]
+				pixs[3] = 255
+			}
+
+			oo++
+		}
+	}
+
+	err := writeImg(w, meaned)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func getObjectIndexFromCoords(os []vectorPos, r image.Rectangle, x, y int) int {
+	xMin := r.Min.X
+	xMax := r.Max.X
+	yMin := r.Min.Y
+	yMax := r.Max.Y
+
+	if x < xMin {
+		x = xMin
+	}
+
+	if x > xMax {
+		x = xMax
+	}
+
+	if y < yMin {
+		y = yMin
+	}
+
+	if y > yMax {
+		y = yMax
+	}
+
+	oi := 0
+	// horrible, but eh
+	xbreak := false
+	for xx := xMin; xx < xMax; xx++ {
+		for yy := xMin; yy < yMax; yy++ {
+			if xx == x && yy == y {
+				xbreak = true
+				break
+			}
+			oi++
+		}
+		if xbreak {
+			break
+		}
+	}
+
+	if oi >= len(os) {
+		oi = len(os) - 1
+	}
+
+	return oi
+}
+
+// end EXAM
