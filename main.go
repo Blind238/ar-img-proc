@@ -47,8 +47,6 @@ func main() {
 	ref = nm
 	// ref = m.(*image.NRGBA)
 
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	http.HandleFunc("/reference", refHandler)
 	http.HandleFunc("/grayscale", grayHandler)
 	http.HandleFunc("/yuv", yuvHandler)
