@@ -334,7 +334,7 @@ func kmeansHandler(w http.ResponseWriter, r *http.Request) {
 	ii := 0
 
 	for ; changed && ii < 100; ii++ {
-		changed = kmeans(&objects, &clusters)
+		changed = kmeans(objects, clusters)
 	}
 
 	if changed {
@@ -360,35 +360,34 @@ func kmeansHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type work struct {
-	id      int
 	result  [][]vectorPos
 	changed bool
 }
 
-func kmeans(objects *[]vectorPos, clusters *[]cluster) bool {
+func kmeans(objects []vectorPos, clusters []cluster) bool {
 	changed := false
 
 	// reset cluster collection
-	for i := range *clusters {
-		(*clusters)[i].v = make([]vectorPos, 0)
+	for i := range clusters {
+		clusters[i].v = make([]vectorPos, 0)
 	}
 
 	numCPU := runtime.GOMAXPROCS(0)
-	o := len(*objects)
+	o := len(objects)
 	sectionLength := int(math.Floor(float64(o) / float64(numCPU)))
 
 	c := make(chan work)
 
 	for i := 0; i < numCPU; i++ {
 		var section []vectorPos
-		section = (*objects)
+		section = objects
 		i := i
 		if i == numCPU-1 {
 			sl := i * sectionLength
 			sec := section[sl:]
 
 			go func() {
-				c <- scanSection(&sec, clusters, i)
+				c <- scanSection(sec, clusters)
 			}()
 		} else {
 			sl1 := i * sectionLength
@@ -396,16 +395,15 @@ func kmeans(objects *[]vectorPos, clusters *[]cluster) bool {
 			sec := section[sl1:sl2]
 
 			go func() {
-				c <- scanSection(&sec, clusters, i)
+				c <- scanSection(sec, clusters)
 			}()
 		}
 	}
 
-	results := make([][]vectorPos, len(*clusters))
+	results := make([][]vectorPos, len(clusters))
 
 	for i := 0; i < numCPU; i++ {
 		w := <-c
-		// fmt.Println("received", w.id)
 
 		for j := range w.result {
 			results[j] = append(results[j], w.result[j]...)
@@ -417,51 +415,50 @@ func kmeans(objects *[]vectorPos, clusters *[]cluster) bool {
 	}
 
 	for i := range results {
-		(*clusters)[i].v = append((*clusters)[i].v, results[i]...)
+		clusters[i].v = append(clusters[i].v, results[i]...)
 	}
 
-	for i, c := range *clusters {
+	for i, c := range clusters {
 		var sum vector
 		for _, v := range c.v {
 			sum = vectorSum(sum, v.toVector())
 		}
 		l := len(c.v)
 
-		(*clusters)[i].position = sum.scalarProduct(1 / float64(l))
+		clusters[i].position = sum.scalarProduct(1 / float64(l))
 	}
 
 	return changed
 }
 
-func scanSection(o *[]vectorPos, cs *[]cluster, wha int) work {
+func scanSection(o []vectorPos, cs []cluster) work {
 
 	changed := false
-	vs := make([][]vectorPos, len(*cs))
+	vs := make([][]vectorPos, len(cs))
 	// first dimension is cluster, second dimension is for vectors
 
-	for i, v := range *o {
+	for i, v := range o {
 		closest := getClosest(&v, cs)
 
 		if v.cluster != closest {
 			changed = true
-			(*o)[i].cluster = closest
+			o[i].cluster = closest
 		}
 
 		vs[closest] = append(vs[closest], v)
 	}
 
 	return work{
-		id:      wha,
 		result:  vs,
 		changed: changed,
 	}
 }
 
-func getClosest(o *vectorPos, cs *[]cluster) int {
+func getClosest(o *vectorPos, cs []cluster) int {
 	v := o.toVector()
 	var n float64
 	var closest int
-	for i, c := range *cs {
+	for i, c := range cs {
 		d := math.Pow(vectorDistance(v, c.position), 2)
 
 		if n == 0 {
