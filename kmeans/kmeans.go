@@ -39,16 +39,16 @@ func vectorSum(v1, v2 vector) vector {
 	}
 }
 
-type cluster struct {
-	centroid vector
-	v        []vectorPos
+type centroid struct {
+	vector
+	cluster []vectorPos
 }
 
 type vectorPos struct {
 	vector
-	x       int
-	y       int
-	cluster int
+	x         int
+	y         int
+	clusterID int
 }
 
 func (v vectorPos) toVector() vector {
@@ -59,7 +59,7 @@ func ProcessImage(kref *image.NRGBA, clustAmount int) *image.NRGBA {
 	t := time.Now()
 
 	objects := make([]vectorPos, kref.Bounds().Dx()*kref.Bounds().Dy())
-	centroids := make([]cluster, clustAmount)
+	centroids := make([]centroid, clustAmount)
 
 	var o int
 	for x := 0; x < kref.Bounds().Dx(); x++ {
@@ -80,7 +80,7 @@ func ProcessImage(kref *image.NRGBA, clustAmount int) *image.NRGBA {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 	for i := 0; i < clustAmount; i++ {
 		r := rand.Intn(len(objects))
-		centroids[i].centroid = objects[r].toVector()
+		centroids[i].vector = objects[r].toVector()
 	}
 
 	changed := true
@@ -98,10 +98,10 @@ func ProcessImage(kref *image.NRGBA, clustAmount int) *image.NRGBA {
 
 	meaned := image.NewNRGBA(kref.Bounds())
 	for _, c := range centroids {
-		for _, o := range c.v {
+		for _, o := range c.cluster {
 			pixOrigin := meaned.PixOffset(o.x, o.y)
 			pixs := meaned.Pix[pixOrigin : pixOrigin+4]
-			pixs[0], pixs[1], pixs[2] = vectorToColor(c.centroid)
+			pixs[0], pixs[1], pixs[2] = vectorToColor(c.vector)
 			pixs[3] = 255
 		}
 	}
@@ -116,12 +116,12 @@ type work struct {
 	changed bool
 }
 
-func kmeans(objects []vectorPos, clusters []cluster) bool {
+func kmeans(objects []vectorPos, centroids []centroid) bool {
 	changed := false
 
 	// reset cluster collection
-	for i := range clusters {
-		clusters[i].v = make([]vectorPos, 0)
+	for i := range centroids {
+		centroids[i].cluster = make([]vectorPos, 0)
 	}
 
 	numCPU := runtime.GOMAXPROCS(0)
@@ -139,7 +139,7 @@ func kmeans(objects []vectorPos, clusters []cluster) bool {
 			sec := section[sl:]
 
 			go func() {
-				c <- scanSection(sec, clusters)
+				c <- scanSection(sec, centroids)
 			}()
 		} else {
 			sl1 := i * sectionLength
@@ -147,12 +147,12 @@ func kmeans(objects []vectorPos, clusters []cluster) bool {
 			sec := section[sl1:sl2]
 
 			go func() {
-				c <- scanSection(sec, clusters)
+				c <- scanSection(sec, centroids)
 			}()
 		}
 	}
 
-	results := make([][]vectorPos, len(clusters))
+	results := make([][]vectorPos, len(centroids))
 
 	for i := 0; i < numCPU; i++ {
 		w := <-c
@@ -167,23 +167,23 @@ func kmeans(objects []vectorPos, clusters []cluster) bool {
 	}
 
 	for i := range results {
-		clusters[i].v = append(clusters[i].v, results[i]...)
+		centroids[i].cluster = append(centroids[i].cluster, results[i]...)
 	}
 
-	for i, c := range clusters {
+	for i, c := range centroids {
 		var sum vector
-		for _, v := range c.v {
+		for _, v := range c.cluster {
 			sum = vectorSum(sum, v.toVector())
 		}
-		l := len(c.v)
+		l := len(c.cluster)
 
-		clusters[i].centroid = sum.scalarProduct(1 / float64(l))
+		centroids[i].vector = sum.scalarProduct(1 / float64(l))
 	}
 
 	return changed
 }
 
-func scanSection(o []vectorPos, cs []cluster) work {
+func scanSection(o []vectorPos, cs []centroid) work {
 
 	changed := false
 	vs := make([][]vectorPos, len(cs))
@@ -192,9 +192,9 @@ func scanSection(o []vectorPos, cs []cluster) work {
 	for i, v := range o {
 		closest := getClosest(&v, cs)
 
-		if v.cluster != closest {
+		if v.clusterID != closest {
 			changed = true
-			o[i].cluster = closest
+			o[i].clusterID = closest
 		}
 
 		vs[closest] = append(vs[closest], v)
@@ -206,12 +206,12 @@ func scanSection(o []vectorPos, cs []cluster) work {
 	}
 }
 
-func getClosest(o *vectorPos, cs []cluster) int {
+func getClosest(o *vectorPos, cs []centroid) int {
 	v := o.toVector()
 	var n float64
 	var closest int
 	for i, c := range cs {
-		d := math.Pow(vectorDistance(v, c.centroid), 2)
+		d := math.Pow(vectorDistance(v, c.vector), 2)
 
 		if n == 0 {
 			n = d
