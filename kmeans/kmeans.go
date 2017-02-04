@@ -51,10 +51,6 @@ type vectorPos struct {
 	clusterID int
 }
 
-func (v vectorPos) toVector() vector {
-	return v.vector
-}
-
 func ProcessImage(kref *image.NRGBA, clustAmount int) *image.NRGBA {
 	t := time.Now()
 
@@ -80,7 +76,7 @@ func ProcessImage(kref *image.NRGBA, clustAmount int) *image.NRGBA {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 	for i := 0; i < clustAmount; i++ {
 		r := rand.Intn(len(objects))
-		centroids[i].vector = objects[r].toVector()
+		centroids[i].vector = objects[r].vector
 	}
 
 	changed := true
@@ -173,7 +169,7 @@ func kmeans(objects []vectorPos, centroids []centroid) bool {
 	for i, c := range centroids {
 		var sum vector
 		for _, v := range c.cluster {
-			sum = vectorSum(sum, v.toVector())
+			sum = vectorSum(sum, v.vector)
 		}
 		l := len(c.cluster)
 
@@ -207,7 +203,7 @@ func scanSection(o []vectorPos, cs []centroid) work {
 }
 
 func getClosest(o *vectorPos, cs []centroid) int {
-	v := o.toVector()
+	v := o.vector
 	var n float64
 	var closest int
 	for i, c := range cs {
