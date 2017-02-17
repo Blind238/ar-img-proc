@@ -85,8 +85,7 @@ func benchmarkKmeans(i int, b *testing.B) {
 		copy(testSet, testCentroidSets[i-1])
 
 		changed := true
-		var ii int
-		for ; changed && ii < 100; ii++ {
+		for changed {
 			changed = kmeans(objects, testSet)
 		}
 	}
