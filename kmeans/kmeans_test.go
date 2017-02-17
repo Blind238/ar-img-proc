@@ -9,6 +9,8 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+
+	"github.com/Blind238/arimgproc/interpolate"
 )
 
 var ref *image.NRGBA
@@ -19,7 +21,7 @@ var testCentroidSets [][]centroid
 
 func TestMain(m *testing.M) {
 	// setup (load and prep image)
-	f, err := os.Open("../images/sample.png")
+	f, err := os.Open("../images/forest.jpg")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -36,7 +38,8 @@ func TestMain(m *testing.M) {
 	nm := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
 	draw.Draw(nm, nm.Bounds(), img, b.Min, draw.Src)
 
-	ref = nm
+	// ref = nm
+	ref = scale(nm, 0.1).(*image.NRGBA)
 
 	// create data from image
 	objects = make([]vectorPos, ref.Bounds().Dx()*ref.Bounds().Dy())
@@ -98,3 +101,27 @@ func BenchmarkKmeans3(b *testing.B) { benchmarkKmeans(3, b) }
 func BenchmarkKmeans4(b *testing.B) { benchmarkKmeans(4, b) }
 func BenchmarkKmeans5(b *testing.B) { benchmarkKmeans(5, b) }
 func BenchmarkKmeans6(b *testing.B) { benchmarkKmeans(6, b) }
+
+func scale(src image.Image, f float64) image.Image {
+	b := src.Bounds()
+
+	scaledB := image.Rect(0, 0, int(float64(b.Dx())*f), int(float64(b.Dy())*f))
+
+	var target image.Image = image.NewNRGBA(scaledB)
+
+	s := *src.(*image.NRGBA)
+	t := *target.(*image.NRGBA)
+
+	x := scaledB.Dx()
+	y := scaledB.Dy()
+
+	for xi := 0; xi < x; xi++ {
+
+		for yi := 0; yi < y; yi++ {
+			interpolate.BiLinear(&s, &t, xi, yi, f)
+		}
+
+	}
+
+	return target
+}
